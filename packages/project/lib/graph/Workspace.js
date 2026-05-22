@@ -6,7 +6,6 @@ import {promisify} from "node:util";
 import {getLogger} from "@ui5/logger";
 import Module from "./Module.js";
 import {validateWorkspace} from "../validation/validator.js";
-
 const readFile = promisify(fs.readFile);
 const log = getLogger("graph:Workspace");
 
@@ -30,6 +29,8 @@ const log = getLogger("graph:Workspace");
  * @public
  * @typedef {object} @ui5/project/graph/Workspace~DependencyManagementResolution
  * @property {string} path Relative path to use for the workspace resolution process
+ * @property {string} [config] Path to a custom UI5 configuration YAML file for this dependency.
+ *   Only supported starting with specVersion workspace/2.0.
  */
 
 /**
@@ -138,13 +139,25 @@ class Workspace {
 			};
 		}
 
+		// Determine whether the 'config' property on resolutions is supported by the current specVersion
+		const workspaceSpecVersion = this.#configuration.specVersion;
+		const supportsConfigOverride = this._isConfigOverrideSupported(workspaceSpecVersion);
+
 		let resolvedModules = await Promise.all(resolutions.map(async (resolutionConfig) => {
 			if (!resolutionConfig.path) {
 				throw new Error(
 					`Missing property 'path' in dependency resolution configuration of workspace ${this.getName()}`);
 			}
+			if (resolutionConfig.config && !supportsConfigOverride) {
+				throw new Error(
+					`The 'config' property in dependency resolution configuration is only supported ` +
+					`starting with workspace specVersion "workspace/2.0". ` +
+					`The current specVersion is "${workspaceSpecVersion}". ` +
+					`Workspace: ${this.getName()}`
+				);
+			}
 			return await this._getModulesFromPath(
-				this.#cwd, resolutionConfig.path);
+				this.#cwd, resolutionConfig.path, true, resolutionConfig.config);
 		}));
 
 		// Flatten array since package-workspaces might have resolved to multiple modules for a single resolution
@@ -175,7 +188,42 @@ class Workspace {
 		};
 	}
 
-	async _getModulesFromPath(cwd, relPath, failOnMissingFiles = true) {
+	/**
+	 * Returns whether the workspace specVersion supports the 'config' override property
+	 * on resolution entries (requires workspace/2.0 or above).
+	 *
+	 * The workspace specVersion uses the format "workspace/X.Y" (e.g. "workspace/1.0"),
+	 * so we extract the numeric part for comparison.
+	 *
+	 * @private
+	 * @param {string} workspaceSpecVersion The workspace specVersion string
+	 * @returns {boolean} Whether the 'config' property is supported
+	 */
+	_isConfigOverrideSupported(workspaceSpecVersion) {
+		// Parse the version number from "workspace/X.Y" format
+		const match = workspaceSpecVersion && workspaceSpecVersion.match(/^workspace\/(\d+\.\d+)$/);
+		if (!match) {
+			return false;
+		}
+		const numericVersion = parseFloat(match[1]);
+		return numericVersion >= 2.0;
+	}
+
+	/**
+	 * Resolves modules from a path.
+	 * When configOverridePath is provided, the Module will use that custom config file
+	 * instead of the default ui5.yaml for the package found at the given path.
+	 * Note: configOverridePath is not passed through when recursing into npm workspaces,
+	 * as those sub-packages have their own individual configs.
+	 *
+	 * @private
+	 * @param {string} cwd Working directory
+	 * @param {string} relPath Relative path from cwd
+	 * @param {boolean} [failOnMissingFiles=true] Whether to throw on missing package.json
+	 * @param {string} [configOverridePath] Optional path to a custom config YAML file (relative to nodePath)
+	 * @returns {Promise<Module[]>}
+	 */
+	async _getModulesFromPath(cwd, relPath, failOnMissingFiles = true, configOverridePath) {
 		const nodePath = path.join(cwd, relPath);
 		if (this.#visitedNodePaths.has(nodePath)) {
 			log.verbose(`Module located at ${nodePath} has already been visited`);
@@ -202,10 +250,18 @@ class Workspace {
 
 		// If the package.json defines an npm "workspaces", or an equivalent "ui5.workspaces" configuration,
 		// resolve the workspace and only use the resulting modules. The root package is ignored.
+		// Note: configOverridePath is intentionally NOT passed through to the sub-packages since each
+		//   sub-package in an npm workspace should have its own configuration.
 		const packageWorkspaceConfig = pkg.ui5?.workspaces || pkg.workspaces;
 		if (packageWorkspaceConfig?.length) {
-			log.verbose(`Module ${pkg.name} provides a package.json workspaces configuration. ` +
-				`Ignoring the module and resolving workspaces instead...`);
+			if (configOverridePath) {
+				log.verbose(
+					`Module ${pkg.name} provides a package.json workspaces configuration. ` +
+					`The 'config' override path "${configOverridePath}" will not be applied to resolved sub-packages.`);
+			} else {
+				log.verbose(`Module ${pkg.name} provides a package.json workspaces configuration. ` +
+					`Ignoring the module and resolving workspaces instead...`);
+			}
 			const staticPatterns = [];
 			// Split provided patterns into dynamic and static patterns
 			// This is necessary, since fast-glob currently behaves different from
@@ -235,6 +291,7 @@ class Workspace {
 
 			const resolvedModules = new Map();
 			await Promise.all(searchPaths.map(async (pkgPath) => {
+				// configOverridePath is NOT passed here: each sub-package uses its own default config
 				const modules = await this._getModulesFromPath(nodePath, pkgPath, staticPatterns.includes(pkgPath));
 				modules.forEach((module) => {
 					const id = module.getId();
@@ -245,11 +302,22 @@ class Workspace {
 			}));
 			return Array.from(resolvedModules.values());
 		} else {
-			return [new Module({
+			const moduleOptions = {
 				id: pkg.name,
 				version: pkg.version,
 				modulePath: nodePath
-			})];
+			};
+			if (configOverridePath) {
+				// Resolve the configOverridePath relative to the module's nodePath
+				const resolvedConfigPath = path.isAbsolute(configOverridePath) ?
+					configOverridePath :
+					path.join(nodePath, configOverridePath);
+				moduleOptions.configPath = resolvedConfigPath;
+				log.verbose(
+					`Module ${pkg.name}: using custom config file "${configOverridePath}" ` +
+					`(resolved to "${resolvedConfigPath}")`);
+			}
+			return [new Module(moduleOptions)];
 		}
 	}
 

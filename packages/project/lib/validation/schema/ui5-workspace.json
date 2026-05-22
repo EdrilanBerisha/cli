@@ -5,12 +5,19 @@
 	"description": "Schema for UI5 CLI Workspace Configuration File (ui5-workspace.yaml)",
 	"$comment": "See https://ui5.github.io/cli/",
 	"type": "object",
-	"required": ["specVersion", "metadata", "dependencyManagement"],
+	"required": [
+		"specVersion",
+		"metadata",
+		"dependencyManagement"
+	],
 	"additionalProperties": false,
 	"properties": {
 		"specVersion": {
-			"enum": ["workspace/1.0"],
-			"errorMessage": "Unsupported \"specVersion\"\nYour UI5 CLI installation might be outdated.\nSupported specification versions: \"workspace/1.0\"\nFor details, see: https://ui5.github.io/cli/stable/pages/Workspace/#workspace-specification-versions"
+			"enum": [
+				"workspace/1.0",
+				"workspace/2.0"
+			],
+			"errorMessage": "Unsupported \"specVersion\"\nYour UI5 CLI installation might be outdated.\nSupported specification versions: \"workspace/1.0\", \"workspace/2.0\"\nFor details, see: https://ui5.github.io/cli/stable/pages/Workspace/#workspace-specification-versions"
 		},
 		"metadata": {
 			"$ref": "#/definitions/metadata"
@@ -22,7 +29,9 @@
 	"definitions": {
 		"metadata": {
 			"type": "object",
-			"required": ["name"],
+			"required": [
+				"name"
+			],
 			"additionalProperties": false,
 			"properties": {
 				"name": {
@@ -42,13 +51,16 @@
 			"properties": {
 				"resolutions": {
 					"type": "array",
-
 					"items": {
 						"type": "object",
 						"additionalProperties": false,
 						"properties": {
 							"path": {
 								"type": "string"
+							},
+							"config": {
+								"type": "string",
+								"description": "Relative path to a custom UI5 configuration YAML file to use for this workspace resolution. Only applicable for specVersion workspace/2.0 and above."
 							}
 						}
 					}

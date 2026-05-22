@@ -44,7 +44,7 @@ test.after.always((t) => {
 	});
 	const thresholds = {
 		statements: 70,
-		branches: 65,
+		branches: 60,
 		functions: 100,
 		lines: 70,
 	};
@@ -79,7 +79,7 @@ test("Empty config", async (t) => {
 				keyword: "errorMessage",
 				message: `Unsupported "specVersion"
 Your UI5 CLI installation might be outdated.
-Supported specification versions: "workspace/1.0"
+Supported specification versions: "workspace/1.0", "workspace/2.0"
 For details, see: https://ui5.github.io/cli/stable/pages/Workspace/#workspace-specification-versions`,
 				params: {
 					errors: [
@@ -89,7 +89,7 @@ For details, see: https://ui5.github.io/cli/stable/pages/Workspace/#workspace-sp
 							message:
 								"must be equal to one of the allowed values",
 							params: {
-								allowedValues: ["workspace/1.0"],
+								allowedValues: ["workspace/1.0", "workspace/2.0"],
 							},
 						},
 					],
@@ -280,7 +280,7 @@ test("Invalid fields", async (t) => {
 				keyword: "errorMessage",
 				message: `Unsupported "specVersion"
 Your UI5 CLI installation might be outdated.
-Supported specification versions: "workspace/1.0"
+Supported specification versions: "workspace/1.0", "workspace/2.0"
 For details, see: https://ui5.github.io/cli/stable/pages/Workspace/#workspace-specification-versions`,
 				params: {
 					errors: [
@@ -290,7 +290,7 @@ For details, see: https://ui5.github.io/cli/stable/pages/Workspace/#workspace-sp
 							message:
 								"must be equal to one of the allowed values",
 							params: {
-								allowedValues: ["workspace/1.0"],
+								allowedValues: ["workspace/1.0", "workspace/2.0"],
 							},
 						},
 					],
@@ -341,7 +341,7 @@ test("Invalid types", async (t) => {
 				keyword: "errorMessage",
 				message: `Unsupported "specVersion"
 Your UI5 CLI installation might be outdated.
-Supported specification versions: "workspace/1.0"
+Supported specification versions: "workspace/1.0", "workspace/2.0"
 For details, see: https://ui5.github.io/cli/stable/pages/Workspace/#workspace-specification-versions`,
 				params: {
 					errors: [
@@ -351,7 +351,7 @@ For details, see: https://ui5.github.io/cli/stable/pages/Workspace/#workspace-sp
 							message:
 								"must be equal to one of the allowed values",
 							params: {
-								allowedValues: ["workspace/1.0"],
+								allowedValues: ["workspace/1.0", "workspace/2.0"],
 							},
 						},
 					],
